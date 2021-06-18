@@ -22,24 +22,24 @@ const path = require('path');
 const mongoose = require('mongoose');
 // one of many engines used to parse ejs
 const ejsMate = require('ejs-mate');
-const ExpressError = require('./utils/ExpressError');
-const methodOverride = require('method-override');
 const session = require('express-session');
 const flash = require('connect-flash');
+const ExpressError = require('./utils/ExpressError');
+const methodOverride = require('method-override');
 const passport = require('passport');
 const LocalStrategy = require('passport-local');
 const User = require('./models/user');
 const mongoSanitize = require('express-mongo-sanitize');
-const helmet = require('helmet');
-const MongoStore = require('connect-mongo');
-
-
-
 // GET ALL ROUTES
+const userRoutes = require('./routes/users');
 const campgroundRoutes = require('./routes/campgrounds');
 const reviewRoutes = require('./routes/reviews');
+const helmet = require('helmet');
+
+const MongoStore = require('connect-mongo');
+
 const dbUrl = process.env.DB_URL || 'mongodb://localhost:27017/YelpCamp';
-const userRoutes = require('./routes/users');
+
 
 // CONNECT OPERATION TO MONGO
 mongoose.connect(dbUrl, {
@@ -48,6 +48,7 @@ mongoose.connect(dbUrl, {
   useUnifiedTopology: true,
   useFindAndModify: false,
 });
+
 const db = mongoose.connection;
 db.on('error', console.error.bind(console, 'connection error:'));
 db.once('open', () => {
@@ -59,21 +60,20 @@ const app = express();
 
 // BASIC SETUP FOR EJS AND METHODOVERRIDE
 app.engine('ejs', ejsMate);
-app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'views'));
 
 app.use(express.urlencoded({ extended: true }));
 app.use(methodOverride('_method'));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // MONGO SANITIZE
+app.use(mongoSanitize({
+  replaceWith: '_'
+}));
 
+const secret = process.env.SECRET || 'foo';
 
-
-
-const secret = process.env.SECRET || 'foo'
-
-app.use(mongoSanitize());
 const store = new MongoStore({
   mongoUrl: dbUrl,
   secret: secret,
@@ -100,7 +100,8 @@ const sessionConfig = {
   }
 }
 app.use(session(sessionConfig));
-// SESSION MUST COME BEFORE INIT SESSION W/PASSPORT
+app.use(flash());
+app.use(helmet());
 
 // CONTENT SECURITY POLICY
 const scriptSrcUrls = [
@@ -159,7 +160,7 @@ passport.serializeUser(User.serializeUser());
 passport.deserializeUser(User.deserializeUser());
 
 // FLASH SETUP
-app.use(flash());
+
 app.use((req, res, next) => {
   res.locals.currentUser = req.user;
   res.locals.success = req.flash('success');
@@ -168,9 +169,10 @@ app.use((req, res, next) => {
 });
 
 // CAMPGROUND & REVIEW ROUTES
+app.use('/', userRoutes);
 app.use('/campgrounds', campgroundRoutes);
 app.use('/campgrounds/:id/reviews', reviewRoutes);
-app.use('/', userRoutes);
+
 
 // ROOT DIRECTORY
 app.get('/', (req, res) => {
