@@ -75,7 +75,7 @@ const secret = process.env.SECRET || 'foo'
 
 app.use(mongoSanitize());
 const store = new MongoStore({
-  mongoUrl: localDb,
+  mongoUrl: dbUrl,
   secret: secret,
   // SECONDS
   touchAfter: 24 * 60 * 60
